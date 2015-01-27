@@ -1,0 +1,81 @@
+---
+title: "Facebook Birthday Plot"
+author: Yuji Shen
+output: html_document
+---
+
+## Data
+128 Facebook friends' birthday of my account.
+
+1. [Export my friends' birthday to Google Calendar](https://www.facebook.com/help/152652248136178/)
+2. Use an [online tool](http://www.gcal2excel.com/) to export Google Calendar event to csv file.
+3. Keep the start date and delete other column.
+
+```{r}
+library(lubridate)
+library(ggplot2)
+library(ggthemes)
+birth <- read.csv("birthday.csv")
+```
+
+## Data Processing
+Following code is the orginal code and the traditional way I used to process the data.
+```{r, eval=FALSE}
+birth$birthday <- mdy_hm(birth$birthday)
+birth$month <- month(birth$birthday)
+birth$day <- mday(birth$birthday)
+birth$weekday <- wday(birth$birthday)
+birth$weekday <- factor(birth$weekday, levels = c('Mon', 'Tues','Wed','Thurs','Fri','Sat','Sun'), ordered=T)
+```
+
+*This chunk of code use `eval = FALSE`, so that it will not run during knitring.*
+
+This is a concise code after looking at the [post](http://forums.udacity.com/questions/100168975/birthday-file-provided#ud651) in Udacity forum.
+
+```{r}
+temp <- mdy_hm(birth$birthday)
+birth <- data.frame(birthday = temp,
+                    month = month(temp, label = T),
+                    day = mday(temp),
+                    weekday = wday(temp, label = T, abbr = T))
+birth$weekday <- factor(birth$weekday, levels = c('Mon', 'Tues','Wed','Thurs','Fri','Sat','Sun'), ordered=T)
+```
+
+## Plot
+Although I trid other themes, I found the themes [*Fe-2*](http://forums.udacity.com/answer_link/100191170/#ud651) used is really good. So I just use his style.
+
+```{r}
+ggplot(aes(x = month, fill = month), data = birth) +
+  geom_histogram(color = "black", show_guide = FALSE) +
+  scale_fill_brewer(palette="Paired") +
+  stat_bin(aes(label=..count..), vjust=-.2, 
+             geom="text", position="identity") +
+  xlab("Month") +
+  ylab("Number of Birthday per Month") +
+  theme_tufte()
+```
+
+Using `scale_x_discrete`, not `scale_x_continuous`.
+```{r}
+ggplot(aes(x = day), data = birth) +
+  geom_histogram(binwidth = 1, color = "white", fill = "cyan") +
+  scale_x_discrete(breaks = seq(1, 31, 1)) +
+  stat_bin(aes(label = ..count..), vjust = -0.2, size = 4,
+           geom = "text", position = "identity") +
+  labs(x = "Day of Month", y = "Number of Birthday per Day") +
+  theme_tufte()
+```
+
+**I change the size of label because it is too large for those thin bars.**
+
+```{r}
+ggplot(aes(x = weekday, fill = weekday), data = birth) +
+  geom_histogram(color = "black", show_guide = F) +
+  stat_bin(aes(label = ..count..), vjust = -0.2,
+           geom = "text", position = "identity") +
+  scale_fill_brewer(palette = "Set1") +
+  labs(x = "Day of Week", y = "Number of Birthday per Day") +
+  theme_tufte()
+```
+
+After finish the plot I found a flaw on this data: The day of week is based on their 2015 birthday, not their born birthday. It is hard to get the exact year of friends, because the limitation of calendar exportation.
