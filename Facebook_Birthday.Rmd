@@ -11,6 +11,13 @@ output: html_document
 2. Use an [online tool](http://www.gcal2excel.com/) to export Google Calendar event to csv file.
 3. Keep the start date and delete other column.
 
+```{r echo = FALSE}
+knitr::opts_chunk$set(warning = FALSE, 
+                      message = FALSE,
+                      fig.path = "figure/figure-");
+```
+
+
 ```{r}
 library(lubridate)
 library(ggplot2)
