@@ -1,0 +1,60 @@
+
+## Data
+I choose a data set about suicide on Gapminder. [Suicide, age adjusted, per 100 000](https://spreadsheets.google.com/spreadsheet/pub?key=0AgogXXPMARyldHJvTXVtdUkwWTZQaHB3bmo2cVhhX0E&gid=0).
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(warning = FALSE, 
+                      message = FALSE,
+                      fig.path = "figure/");
+library(ggplot2)
+library(reshape2)
+suicide <- read.csv('/Users/Yuji/Library/Mobile Documents/com~apple~CloudDocs/Course/Data Analysis with R/Problem_Set_3/Suicide/suicide.csv', na.strings = "NA", header = T, row.names = 1)
+# rowMeans(suicide, na.rm = T)
+# colMeans(suicide, na.rm = T)
+```
+
+## Data Process
+There are total 56 years (1950 - 2005) data, but most countries have missing value in several years.
+
+Let's see how many countries have records all the time, and who are they.
+```{r}
+nrow(suicide[rowSums(!is.na(suicide)) == 56,])
+row.names(suicide[rowSums(!is.na(suicide)) == 56,])
+```
+
+Then I subtract two datasets from original data:
+1. `data`: Countries have more than 30 years records.
+2. `data.2`: Countries have all records.
+
+```{r}
+data <- suicide[rowSums(!is.na(suicide)) >= 30,]
+data.2 <- suicide[rowSums(!is.na(suicide)) == 56,]
+```
+
+Next, transform the table to a plot-friendly form. We will have two colomns in each data: `year` and `country`.
+```{r}
+data <- data.frame(t(data), year = c(1950:2005))
+data.2 <- data.frame(t(data.2), year = c(1950:2005))
+df <- melt(data, id="year", variable.name = "country")
+df.2 <- melt(data.2, id="year", variable.name = "country")
+df$year <- factor(df$year)
+df.2$year <- factor(df.2$year)
+```
+
+## Plotting
+```{r}
+ggplot(aes(x = X2005), data = suicide) +
+  geom_histogram()
+
+ggplot(aes(x = X1990), data = suicide) +
+  geom_histogram()
+
+ggplot(aes(x = year, y = value), data = df) +
+  geom_boxplot()
+
+ggplot(aes(x = year,y = value), data = df.2) +
+  geom_line(aes(color = country, group = country)) +
+  scale_x_discrete(breaks = seq(1950, 2005, 5)) +
+  theme(axis.text.x = element_text(angle = 30, size = 9))
+
+```
