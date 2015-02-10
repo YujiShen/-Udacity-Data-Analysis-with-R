@@ -5,6 +5,7 @@ output: html_document
 ---
 
 ## Data
+*******
 128 Facebook friends' birthday of my account.
 
 1. [Export my friends' birthday to Google Calendar](https://www.facebook.com/help/152652248136178/)
@@ -26,6 +27,7 @@ birth <- read.csv("birthday.csv")
 ```
 
 ## Data Processing
+*******
 Following code is the orginal code and the traditional way I used to process the data.
 ```{r, eval=FALSE}
 birth$birthday <- mdy_hm(birth$birthday)
@@ -49,6 +51,7 @@ birth$weekday <- factor(birth$weekday, levels = c('Mon', 'Tues','Wed','Thurs','F
 ```
 
 ## Plot
+*******
 Although I trid other themes, I found the themes [*Fe-2*](http://forums.udacity.com/answer_link/100191170/#ud651) used is really good. So I just use his style.
 
 ```{r}
@@ -86,3 +89,53 @@ ggplot(aes(x = weekday, fill = weekday), data = birth) +
 ```
 
 After finish the plot I found a flaw on this data: The day of week is based on their 2015 birthday, not their born birthday. It is hard to get the exact year of friends, because the limitation of calendar exportation.
+
+## Analysis
+*******
+### Permutation Test on Month
+```{r}
+set.seed(100)
+sample.100 <- NULL
+# 100 experiments/samples
+for(i in 1:100){
+  # each sample has 100 birthdays month (repersent 100 persons)
+  temp <- sample(1:12,128, replace = T)
+  # get frequency of each month
+  s <- as.matrix(table(temp))
+  # bind into test, each row is a month, each column is one sample table
+  sample.100 <- cbind(sample.100, s)
+}
+
+quantile.table <- NULL
+for(i in 1:12){
+  temp <- quantile(sample.100[i,], 
+                   probs=c(0, 0.01, 0.03, 0.05, 0.1, 0.95, 0.97, 0.99, 1))
+  quantile.table <- rbind(quantile.table, temp)
+}
+row.names(quantile.table) <- month.abb
+```
+
+**Basic idea** 
+
+Compared to the normal hypothsis testing using the sampling distribution of sample _mean_ to infer significance, I use the sampling distribution of sample _frequency_.
+
+**Step**
+
+1. I simulate 100 samples, in order to get the distribution under same sample size, each samples has 128 persons' birthday month. 
+2. My null hypothesis is each month has equal frequency, so I use `sample()` to randomly pull numbers from 1-12.
+3. Then I use `table()` to get frequency for each samples, bind them into a big frequency table.
+4. Last, I calculate the quantile for each month to get _sampling distribution of sample frequency_.
+5. Compare the simulation with actual result.
+
+**Table**
+```{r echo=FALSE}
+knitr::kable(quantile.table, caption="Quantile for samples")
+```
+
+**Check the row for _June_, we can see that only 1% samples under 4.97, and our actual record for June (3) just locate in this rare area. So we can say that this result for June is very uncommon, or it is not significant.**
+
+**Questions**
+
+1. Can I say it is not significant? Or I should not use this word here.
+2. What is the p-value in this test?
+3. I know how to check minimum, how about maximum? Say, if a month has frequency lager than 25, can we also say it is uncommon/ non-significant?
