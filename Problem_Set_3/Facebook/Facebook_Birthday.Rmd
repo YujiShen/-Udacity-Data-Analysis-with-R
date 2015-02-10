@@ -139,3 +139,4 @@ knitr::kable(quantile.table, caption="Quantile for samples")
 1. Can I say it is not significant? Or I should not use this word here.
 2. What is the p-value in this test?
 3. I know how to check minimum, how about maximum? Say, if a month has frequency lager than 25, can we also say it is uncommon/ non-significant?
+4. I found the distribution for each month frequency is normal distribution, why? Any statistical explanation?
