@@ -1,0 +1,142 @@
+---
+title: "Facebook Birthday Plot"
+author: Yuji Shen
+output: html_document
+---
+
+## Data
+*******
+128 Facebook friends' birthday of my account.
+
+1. [Export my friends' birthday to Google Calendar](https://www.facebook.com/help/152652248136178/)
+2. Use an [online tool](http://www.gcal2excel.com/) to export Google Calendar event to csv file.
+3. Keep the start date and delete other column.
+
+```{r echo = FALSE}
+knitr::opts_chunk$set(warning = FALSE, 
+                      message = FALSE,
+                      fig.path = "figure/figure-");
+```
+
+
+```{r}
+library(lubridate)
+library(ggplot2)
+library(ggthemes)
+birth <- read.csv("birthday.csv")
+```
+
+## Data Processing
+*******
+Following code is the orginal code and the traditional way I used to process the data.
+```{r, eval=FALSE}
+birth$birthday <- mdy_hm(birth$birthday)
+birth$month <- month(birth$birthday)
+birth$day <- mday(birth$birthday)
+birth$weekday <- wday(birth$birthday)
+birth$weekday <- factor(birth$weekday, levels = c('Mon', 'Tues','Wed','Thurs','Fri','Sat','Sun'), ordered=T)
+```
+
+*This chunk of code use `eval = FALSE`, so that it will not run during knitring.*
+
+This is a concise code after looking at the [post](http://forums.udacity.com/questions/100168975/birthday-file-provided#ud651) in Udacity forum.
+
+```{r}
+temp <- mdy_hm(birth$birthday)
+birth <- data.frame(birthday = temp,
+                    month = month(temp, label = T),
+                    day = mday(temp),
+                    weekday = wday(temp, label = T, abbr = T))
+birth$weekday <- factor(birth$weekday, levels = c('Mon', 'Tues','Wed','Thurs','Fri','Sat','Sun'), ordered=T)
+```
+
+## Plot
+*******
+Although I trid other themes, I found the themes [*Fe-2*](http://forums.udacity.com/answer_link/100191170/#ud651) used is really good. So I just use his style.
+
+```{r}
+ggplot(aes(x = month, fill = month), data = birth) +
+  geom_histogram(color = "black", show_guide = FALSE) +
+  scale_fill_brewer(palette="Paired") +
+  stat_bin(aes(label=..count..), vjust=-.2, 
+             geom="text", position="identity") +
+  xlab("Month") +
+  ylab("Number of Birthday per Month") +
+  theme_tufte()
+```
+
+Using `scale_x_discrete`, not `scale_x_continuous`.
+```{r}
+ggplot(aes(x = day), data = birth) +
+  geom_histogram(binwidth = 1, color = "white", fill = "cyan") +
+  scale_x_discrete(breaks = seq(1, 31, 1)) +
+  stat_bin(aes(label = ..count..), vjust = -0.2, size = 4,
+           geom = "text", position = "identity") +
+  labs(x = "Day of Month", y = "Number of Birthday per Day") +
+  theme_tufte()
+```
+
+**I change the size of label because it is too large for those thin bars.**
+
+```{r}
+ggplot(aes(x = weekday, fill = weekday), data = birth) +
+  geom_histogram(color = "black", show_guide = F) +
+  stat_bin(aes(label = ..count..), vjust = -0.2,
+           geom = "text", position = "identity") +
+  scale_fill_brewer(palette = "Set1") +
+  labs(x = "Day of Week", y = "Number of Birthday per Day") +
+  theme_tufte()
+```
+
+After finish the plot I found a flaw on this data: The day of week is based on their 2015 birthday, not their born birthday. It is hard to get the exact year of friends, because the limitation of calendar exportation.
+
+## Analysis
+*******
+### Permutation Test on Month
+```{r}
+set.seed(100)
+sample.100 <- NULL
+# 100 experiments/samples
+for(i in 1:100){
+  # each sample has 100 birthdays month (repersent 100 persons)
+  temp <- sample(1:12,128, replace = T)
+  # get frequency of each month
+  s <- as.matrix(table(temp))
+  # bind into test, each row is a month, each column is one sample table
+  sample.100 <- cbind(sample.100, s)
+}
+
+quantile.table <- NULL
+for(i in 1:12){
+  temp <- quantile(sample.100[i,], 
+                   probs=c(0, 0.01, 0.03, 0.05, 0.1, 0.95, 0.97, 0.99, 1))
+  quantile.table <- rbind(quantile.table, temp)
+}
+row.names(quantile.table) <- month.abb
+```
+
+**Basic idea** 
+
+Compared to the normal hypothsis testing using the sampling distribution of sample _mean_ to infer significance, I use the sampling distribution of sample _frequency_.
+
+**Step**
+
+1. I simulate 100 samples, in order to get the distribution under same sample size, each samples has 128 persons' birthday month. 
+2. My null hypothesis is each month has equal frequency, so I use `sample()` to randomly pull numbers from 1-12.
+3. Then I use `table()` to get frequency for each samples, bind them into a big frequency table.
+4. Last, I calculate the quantile for each month to get _sampling distribution of sample frequency_.
+5. Compare the simulation with actual result.
+
+**Table**
+```{r echo=FALSE}
+knitr::kable(quantile.table, caption="Quantile for samples")
+```
+
+**Check the row for _June_, we can see that only 1% samples under 4.97, and our actual record for June (3) just locate in this rare area. So we can say that this result for June is very uncommon, or it is not significant.**
+
+**Questions**
+
+1. Can I say it is not significant? Or I should not use this word here.
+2. What is the p-value in this test?
+3. I know how to check minimum, how about maximum? Say, if a month has frequency lager than 25, can we also say it is uncommon/ non-significant?
+4. I found the distribution for each month frequency is normal distribution, why? Any statistical explanation?
