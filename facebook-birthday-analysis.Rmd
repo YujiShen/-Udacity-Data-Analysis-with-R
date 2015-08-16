@@ -1,0 +1,167 @@
+---
+title: "Facebook Birthday Analysis"
+author: "By YUJI SHEN, [yuji.im](http://yuji.im) | <span>JAN 26, 2015</span>"
+output: 
+  html_document: 
+    css: ~/Workspace/Web/markdown.css
+---
+******
+## Data
+There are 163 Facebook friends' have birthday in there profile of my account. This is the basic step to export birthday data.
+
+1. [Export my friends' birthday to Google Calendar](https://www.facebook.com/help/152652248136178/)
+2. Use an [online tool](http://www.gcal2excel.com/) to export Google Calendar event to csv file.
+
+After I got the csv file, it's time for R.
+
+```{r echo = FALSE}
+knitr::opts_chunk$set(warning = FALSE, 
+                      message = FALSE,
+                      fig.align = "center");
+library(lubridate)
+library(ggplot2)
+library(ggthemes)
+```
+
+## Data Processing
+I use `lubridate` library to parse the date and extract relevant information from it, such as day of month, day of week, etc.
+
+```{r echo=FALSE}
+birth <- read.csv('/Users/Yuji/Workspace/GitHub/Udacity_Data_Analysis_with_R/facebook_birthday.csv')
+
+temp <- mdy_hm(birth$Start)
+birth <- data.frame(birthday = temp,
+                    month = month(temp, label = T),
+                    day = mday(temp),
+                    weekday = wday(temp, label = T, abbr = T))
+birth$weekday <- factor(birth$weekday, levels = c('Mon', 'Tues','Wed','Thurs','Fri','Sat','Sun'), ordered=T)
+birth$day <- factor(birth$day, levels = c(1:31), ordered = T)
+```
+
+## Exploratory Data Analysis
+Below are three plot I make for different measure of the date of birthday.
+
+```{r}
+ggplot(aes(x = month, fill = month), data = birth) +
+  geom_histogram(color = "black", show_guide = FALSE) +
+  scale_fill_brewer(palette="Paired") +
+  stat_bin(aes(label=..count..), vjust=-.2, 
+             geom="text", position="identity") +
+  xlab("Month") +
+  ylim(c(0,22)) +
+  ggtitle("Number of Birthday per Month") +
+  theme_tufte() +
+  theme(axis.ticks.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.title.y = element_blank())
+```
+
+I use bar chart here to demonstrate how many birthdays in each month. It is clear that June has a relatively low frequency. In general, we assume the probability that people born each day in a year is equal, aka uniform distribution. Based on this assumption, when our sample size is large, the number of people born in each month should not have too much difference.
+
+Here is the question, based on this sample size, is 5 people born in June is normal? I will use statistical method to test this in analysis part.
+
+```{r}
+ggplot(aes(x = day), data = birth) +
+  geom_dotplot(method = "histodot", color = "gray", fill = "blue", dotsize = 1) + 
+  scale_y_continuous(limits = c(0,20.5), breaks = 0:15, labels = 0:15) +
+  #scale_x_discrete(breaks = seq(1, 31, 1)) +
+    labs(title = "Number of Birthday per Day", x = "Day of Month") +
+  theme_hc() +
+  theme(plot.title = element_text(vjust = -7),
+        axis.title.y = element_text(hjust = .35))
+```
+
+I use dot plot to show the distribution of number of people born in each day of month. Each dot represent one person. The distribution of this one is much more far from a uniform distribution, but it is expecited because its high degree of freedom and small sample size. 
+
+```{r}
+ggplot(aes(x = weekday, fill = weekday), data = birth) +
+  geom_histogram(color = "black", show_guide = F, width = 0.7) +
+  stat_bin(aes(label = ..count..), vjust = -0.2,
+           geom = "text", position = "identity") +
+  labs(x = "Day of Week", title = "Number of Birthday per Day in a Week (2016)") +
+  ylim(0,32) +
+  theme_few() +
+  scale_fill_few(palette = "dark") +
+    theme(axis.ticks.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.title.y = element_blank())
+```
+
+The day of week is based on their 2016 birthdays, not their born birthdays. It is hard to get the exact born year due to the limitation of calendar exportation.
+
+## Hypothesis Test
+
+I will perform a Chi-squared Good of Fit Test for the monthly birthday data. The first step I should do it to get the exact probability a people born in each month.
+
+Based on the assumption that people born in each day of year follows the uniform distribution, and account for the Leap Year: each day during a four year period should have the same probability, aka $\frac{1}{365*3 + 366}$. Then sum the days belong to each month in four years and multiply them by this probability. We can treat each event as a Bernoulli event, so the expected number equals n*p.
+
+```{r}
+p <- 1/(365*3 + 366)
+month_p <- c(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+month_p <- 4 * month_p
+month_p[2] <- month_p[2] + 1
+month_p <- month_p * p
+n <- nrow(birth)
+month_exp <- month_p * n
+bar <- data.frame(month = month.abb)
+bar$month <- factor(bar$month, levels = month.abb, ordered =  T)
+bar$real <- as.integer(as.character(table(birth$month)))
+bar$exp <- month_exp
+tab <- as.data.frame(t(bar[-1]))
+tab[1, ] <- as.integer(tab[1, ])
+colnames(tab) <- month.abb
+tab <- rbind(month_p, tab)
+row.names(tab) <- c("P", "Observed", "Expected")
+knitr::kable(tab, digits = 3)
+```
+
+It is more intuitive to look at the plot: black bar represents observed number of people born in that month, red line represents expected number.
+
+```{r}
+cols <- c("Observed" = "black", "Expected" = "red")
+ggplot(aes(x = month), data = bar) +
+  geom_bar(aes(y = real, fill = "Observed"), stat = "identity") +
+  geom_crossbar(aes(y = exp, ymin = exp, ymax = exp, color="Expected")) +
+  xlab("Month") +
+  ylim(c(0,22)) +
+  labs(title = "Number of Birthday per Month") +
+  scale_fill_manual(values = cols, name = "Bar") +
+  scale_color_manual(values = cols, name = "Line") +
+  theme_bw() +
+  theme(axis.title.y = element_blank())
+```
+
+OK, graph looks great. Feb, Apr, May, Sep and Dec seem to follow the assumption well, but other months varies a lot. Next step is to verify whether this sample is suitable to perform the test.
+
+* Independence: These birthdays should be independent because no relatives among them. And I do not choose my friends based on their birthdays. So, this one is good.
+* Sample size: The number of people born in June is 5. Thus, it just satisfies the requirement.
+
+So now we can finally do the test! The code seem quite easy based on what I have got in the table.
+```{r}
+chi <- sum((tab[2,] - tab[3,]) ^ 2/ tab[3,])
+chi
+pchisq(chi, df = 11, lower.tail = F)
+```
+
+We got a p-value 0.11. What dose this mean? This means, based my 163-friends data, under the null hypothesis: birthday follows uniform distribution, our observed data does not deviate too much from the expectation. There are still 11% chance to get worse. In the language of statistic, we can not reject the null hypothesis. But it does not mean I favor uniform distribution, hypothesis test can not prove its validity.
+
+If you are interested with a deeper analysis with a more convicing data (4M!), take a look at the article *[An Analysis of the Distribution of Birthdays in a Calendar Year](http://www.panix.com/~murphy/bday.html)* by Roy Murphy. He made a different conclusion with me. I got some inspiration from his work. Thanks Roy!
+
+<script>
+(function(i, s, o, g, r, a, m) {
+    i['GoogleAnalyticsObject'] = r;
+    i[r] = i[r] || function() {
+        (i[r].q = i[r].q || []).push(arguments)
+    }, i[r].l = 1 * new Date();
+    a = s.createElement(o),
+        m = s.getElementsByTagName(o)[0];
+    a.async = 1;
+    a.src = g;
+    m.parentNode.insertBefore(a, m)
+})(window, document, 'script', '//www.google-analytics.com/analytics.js', 'ga');
+
+ga('create', 'UA-59613226-1', 'auto');
+//ga('require', 'displayfeatures');
+//ga('require', 'linkid', 'linkid.js');
+ga('send', 'pageview');
+</script>
